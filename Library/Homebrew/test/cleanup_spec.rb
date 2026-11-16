@@ -552,6 +552,38 @@ RSpec.describe Homebrew::Cleanup do
       expect(file).to exist
     end
 
+    context "when the prefix libexec directory exists" do
+      let(:libexec) { HOMEBREW_PREFIX/"libexec" }
+
+      before do
+        libexec.mkpath
+      end
+
+      after do
+        FileUtils.rm_rf libexec
+      end
+
+      it "keeps the directory when it is empty" do
+        cleanup.prune_prefix_symlinks_and_directories
+        expect(libexec).to exist
+        expect(libexec.children).to be_empty
+      end
+
+      it "removes broken symlinks and empty subdirectories but keeps used contents" do
+        FileUtils.ln_s libexec/"missing", libexec/"container"
+        plugin = libexec/"container-plugins/plugin"
+        plugin.dirname.mkpath
+        FileUtils.touch plugin
+        empty_dir = libexec/"empty"
+        empty_dir.mkpath
+
+        cleanup.prune_prefix_symlinks_and_directories
+        expect(libexec/"container").not_to exist
+        expect(plugin).to exist
+        expect(empty_dir).not_to exist
+      end
+    end
+
     context "when nested directories exist with only broken symlinks" do
       let(:dir) { HOMEBREW_PREFIX/"lib/foo" }
       let(:child_dir) { dir/"bar" }

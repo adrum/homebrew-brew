@@ -995,7 +995,10 @@ module Homebrew
       dirs = []
       children_count = {}
 
-      Keg.must_exist_subdirectories.each do |dir|
+      # Prefix libexec is managed by formula post-install steps (e.g. shared
+      # plugin directories), so prune inside it but never the root itself.
+      prune_roots = Keg.must_exist_subdirectories + [HOMEBREW_PREFIX/"libexec"]
+      prune_roots.each do |dir|
         next unless dir.directory?
 
         dir.find do |path|
@@ -1013,7 +1016,7 @@ module Homebrew
                 path.unlink
               end
             end
-          elsif path.directory? && Keg.must_exist_subdirectories.exclude?(path)
+          elsif path.directory? && prune_roots.exclude?(path)
             dirs << path
             children_count[path] = path.children.length if dry_run?
           end
