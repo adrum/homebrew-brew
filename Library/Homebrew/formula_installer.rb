@@ -1549,8 +1549,15 @@ on_request: installed_on_request?, options:)
           sandbox.allow_write_path "#{HOMEBREW_PREFIX}/#{dir}"
         end
         # Created ahead of the sandbox so the Linux backend does not record it
-        # as its own and remove it when it is still empty at cleanup.
-        (HOMEBREW_PREFIX/"libexec").mkpath
+        # as its own and remove it when it is still empty at cleanup. Skipped
+        # when the prefix is not writable, e.g. a root-owned /usr/local whose
+        # install predates libexec (Homebrew/install#1170): the sandbox rule
+        # for the absent path is harmless.
+        begin
+          (HOMEBREW_PREFIX/"libexec").mkpath
+        rescue Errno::EPERM, Errno::EACCES, Errno::EROFS
+          nil
+        end
         sandbox.allow_write_path "#{HOMEBREW_PREFIX}/libexec"
         sandbox.protect_homebrew_state
       end

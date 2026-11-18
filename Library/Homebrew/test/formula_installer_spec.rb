@@ -310,6 +310,32 @@ RSpec.describe FormulaInstaller do
       expect(HOMEBREW_PREFIX/"libexec").to be_writable
     end
 
+    it "runs the post-install step when the prefix does not permit creating libexec" do
+      prefix = mktmpdir
+      stub_const("HOMEBREW_PREFIX", prefix)
+      formula = formula("unwritable-prefix-postinstall") do
+        T.bind(self, T.class_of(Formula))
+        url "foo-1.0"
+      end
+      installer = described_class.new(formula)
+      sandbox = instance_double(Sandbox).as_null_object
+
+      allow(installer).to receive(:post_install_formula_path).and_return(formula.path)
+      allow(formula).to receive_messages(logs: mktmpdir, network_access_allowed?: false)
+      allow(Sandbox).to receive_messages(new: sandbox, use_for?: true)
+      expect(Sandbox).to receive(:with_preserved_brew_file).and_yield
+      expect(sandbox).to receive(:run)
+
+      FileUtils.chmod 0555, prefix
+      begin
+        expect { installer.post_install }.not_to output(/did not complete successfully/).to_stderr
+      ensure
+        FileUtils.chmod 0755, prefix
+      end
+
+      expect(HOMEBREW_PREFIX/"libexec").not_to exist
+    end
+
     it "restores bin/brew after a Landlock-sandboxed post-install replaces it" do
       prefix = mktmpdir
       stub_const("HOMEBREW_PREFIX", prefix)
